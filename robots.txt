@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://Always-in-prime.github.io/REPO_NAME/sitemap.xml
