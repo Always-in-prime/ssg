@@ -2,36 +2,23 @@ const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
 
-// Конфигурация для GitHub Pages
 const CONFIG = {
   contentDir: './content',
   outputDir: './dist',
   templateDir: './templates',
   publicDir: './public',
-  siteTitle: 'Мой SSG Сайт',
-  siteUrl: 'https://Always-in-prime.github.io/ssg',
-  // Автоматически определяем basePath для GitHub Pages
+  siteTitle: 'Мое портфолио | Фрилансер',
+  siteUrl: 'https://always-in-prime.github.io/ssg',
+  author: 'always-in-prime',
+  email: 'your@email.com',
+  github: 'https://github.com/always-in-prime',
+  telegram: 'https://t.me/always-in-prime',
   basePath: process.env.GITHUB_ACTIONS ? '/ssg' : ''
 };
 
-// Настройка marked
-marked.setOptions({
-  highlight: function(code, lang) {
-    return `<pre><code class="language-${lang}">${code}</code></pre>`;
-  }
-});
-
-// Создаем папку для вывода
+// Создаем output директорию
 if (!fs.existsSync(CONFIG.outputDir)) {
   fs.mkdirSync(CONFIG.outputDir, { recursive: true });
-}
-
-// Копируем публичные файлы
-function copyPublicFiles() {
-  if (fs.existsSync(CONFIG.publicDir)) {
-    console.log('📁 Копируем статические файлы...');
-    copyFolderRecursive(CONFIG.publicDir, CONFIG.outputDir);
-  }
 }
 
 // Загружаем шаблон
@@ -41,7 +28,6 @@ function loadTemplate() {
     return fs.readFileSync(templatePath, 'utf-8');
   }
   
-  // Расширенный дефолтный шаблон
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -49,57 +35,70 @@ function loadTemplate() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} | {{siteTitle}}</title>
     <meta name="description" content="{{description}}">
-    <meta name="generator" content="Custom SSG">
+    <meta name="author" content="{{author}}">
     <link rel="stylesheet" href="{{basePath}}/css/style.css">
-    <link rel="canonical" href="{{siteUrl}}{{url}}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <header>
         <nav>
-            <div class="nav-container">
+            <div class="container nav-container">
                 <a href="{{basePath}}/" class="logo">{{siteTitle}}</a>
+                <button class="mobile-menu-btn" aria-label="Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <ul class="nav-menu">
                     {{navigation}}
                 </ul>
             </div>
         </nav>
     </header>
-    
-    <main class="container">
-        <article>
-            <h1>{{title}}</h1>
-            {{#if date}}
-            <div class="post-meta">
-                📅 {{date}} | 🏷️ {{#each tags}}{{this}} {{/each}}
-            </div>
-            {{/if}}
-            <div class="content">
-                {{content}}
-            </div>
-        </article>
+
+    <main>
+        {{content}}
     </main>
-    
+
     <footer>
         <div class="container">
-            <p>© {{year}} {{siteTitle}}. Сгенерировано с ❤️</p>
-            <p>Последнее обновление: {{buildDate}}</p>
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>{{author}}</h4>
+                    <p>Фриланс разработчик</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Контакты</h4>
+                    <p><i class="fas fa-envelope"></i> {{email}}</p>
+                    <div class="social-links">
+                        <a href="{{github}}" target="_blank"><i class="fab fa-github"></i></a>
+                        <a href="{{telegram}}" target="_blank"><i class="fab fa-telegram"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; {{year}} {{author}}. Все права защищены.</p>
+            </div>
         </div>
     </footer>
+
+    <script src="{{basePath}}/js/main.js"></script>
 </body>
 </html>`;
 }
 
-// Парсинг frontmatter
 function parseFrontmatter(content) {
   const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
   const match = content.match(frontmatterRegex);
   
   let metadata = {
-    title: 'Untitled',
+    title: 'Без названия',
     description: '',
     date: new Date().toISOString().split('T')[0],
     tags: [],
-    draft: false
+    technologies: [],
+    image: '',
+    link: '',
+    github: '',
+    type: 'work' // work, blog, etc.
   };
   
   let markdownContent = content;
@@ -113,10 +112,10 @@ function parseFrontmatter(content) {
       if (key && valueParts.length) {
         const value = valueParts.join(':').trim();
         
-        if (key.trim() === 'tags') {
+        if (key.trim() === 'technologies') {
+          metadata.technologies = value.split(',').map(t => t.trim());
+        } else if (key.trim() === 'tags') {
           metadata.tags = value.split(',').map(t => t.trim());
-        } else if (key.trim() === 'draft') {
-          metadata.draft = value === 'true';
         } else {
           metadata[key.trim()] = value;
         }
@@ -127,20 +126,61 @@ function parseFrontmatter(content) {
   return { metadata, markdownContent };
 }
 
-// Генерация HTML
-function generatePage(markdownFile, template, navigationHtml) {
+function generateWorksPage(pages) {
+  const works = pages.filter(p => p.metadata.type === 'work' && !p.metadata.draft);
+  
+  let worksHtml = `
+<section class="works-section">
+    <div class="container">
+        <h1>Мои работы</h1>
+        <div class="works-grid">
+  `;
+  
+  works.forEach(work => {
+    worksHtml += `
+    <div class="work-card">
+        ${work.metadata.image ? `<img src="${CONFIG.basePath}${work.metadata.image}" alt="${work.metadata.title}" class="work-image">` : ''}
+        <div class="work-content">
+            <h3>${work.metadata.title}</h3>
+            <p>${work.metadata.description}</p>
+            <div class="work-technologies">
+                ${work.metadata.technologies.map(tech => `<span class="tech-tag">${tech}</span>`).join('')}
+            </div>
+            <div class="work-links">
+                ${work.metadata.link ? `<a href="${work.metadata.link}" target="_blank" class="btn btn-primary">Посмотреть</a>` : ''}
+                ${work.metadata.github ? `<a href="${work.metadata.github}" target="_blank" class="btn btn-secondary">GitHub</a>` : ''}
+                <a href="${CONFIG.basePath}${work.url}" class="btn btn-outline">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    `;
+  });
+  
+  worksHtml += `
+        </div>
+    </div>
+</section>
+  `;
+  
+  return worksHtml;
+}
+
+function generatePage(markdownFile, template, navigationHtml, allPages = []) {
   const content = fs.readFileSync(markdownFile, 'utf-8');
   const { metadata, markdownContent } = parseFrontmatter(content);
   
-  // Пропускаем черновики
   if (metadata.draft && process.env.NODE_ENV !== 'development') {
     return null;
   }
   
-  const htmlContent = marked.parse(markdownContent);
+  let htmlContent = marked.parse(markdownContent);
   
-  // Получаем URL страницы
-  const url = markdownFile === 'index.md' ? '/' : 
+  // Специальная обработка для страницы работ
+  if (markdownFile.includes('works.md') || markdownFile.includes('index.md') && metadata.showWorks) {
+    htmlContent = generateWorksPage(allPages) + htmlContent;
+  }
+  
+  const url = path.basename(markdownFile, '.md') === 'index' ? '/' : 
               `/${path.basename(markdownFile, '.md')}.html`;
   
   let pageHtml = template
@@ -149,45 +189,22 @@ function generatePage(markdownFile, template, navigationHtml) {
     .replace(/{{content}}/g, htmlContent)
     .replace(/{{siteTitle}}/g, CONFIG.siteTitle)
     .replace(/{{year}}/g, new Date().getFullYear())
-    .replace(/{{date}}/g, metadata.date)
-    .replace(/{{url}}/g, url)
+    .replace(/{{author}}/g, CONFIG.author)
+    .replace(/{{email}}/g, CONFIG.email)
+    .replace(/{{github}}/g, CONFIG.github)
+    .replace(/{{telegram}}/g, CONFIG.telegram)
     .replace(/{{basePath}}/g, CONFIG.basePath)
-    .replace(/{{siteUrl}}/g, CONFIG.siteUrl)
-    .replace(/{{buildDate}}/g, new Date().toLocaleString('ru-RU'))
     .replace(/{{navigation}}/g, navigationHtml);
-  
-  // Обработка условных блоков
-  if (metadata.tags && metadata.tags.length) {
-    const tagsHtml = metadata.tags.map(tag => `<span class="tag">${tag}</span>`).join(' ');
-    pageHtml = pageHtml.replace(/{{#if tags}}(.*?){{\/if}}/gs, (match, content) => {
-      return content.replace('{{tags}}', tagsHtml);
-    });
-  } else {
-    pageHtml = pageHtml.replace(/{{#if tags}}[\s\S]*?{{\/if}}/g, '');
-  }
   
   return pageHtml;
 }
 
-// Генерация навигации
-function generateNavigation() {
-  const pages = getAllPages();
-  let navHtml = '';
-  
-  pages.forEach(page => {
-    if (!page.metadata.hideFromNav) {
-      navHtml += `<li><a href="${CONFIG.basePath}${page.url}">${page.metadata.title}</a></li>\n`;
-    }
-  });
-  
-  return navHtml;
-}
-
-// Получение всех страниц
 function getAllPages() {
   const pages = [];
   
   function scanDirectory(dir, basePath = '') {
+    if (!fs.existsSync(dir)) return;
+    
     const files = fs.readdirSync(dir);
     
     files.forEach(file => {
@@ -211,7 +228,8 @@ function getAllPages() {
           filePath,
           url: url.replace(/\/\//g, '/'),
           metadata,
-          outputPath: path.join(CONFIG.outputDir, file === 'index.md' ? 'index.html' : file.replace('.md', '.html'))
+          outputPath: path.join(CONFIG.outputDir, file === 'index.md' ? 'index.html' : `${file.replace('.md', '.html')}`),
+          dir: basePath
         });
       }
     });
@@ -221,7 +239,26 @@ function getAllPages() {
   return pages;
 }
 
-// Копирование папки
+function generateNavigation() {
+  const pages = getAllPages();
+  const navItems = [
+    { title: 'Главная', url: '/' },
+    { title: 'Работы', url: '/works.html' },
+    { title: 'Обо мне', url: '/about.html' },
+    { title: 'Контакты', url: '/contact.html' }
+  ];
+  
+  return navItems.map(item => 
+    `<li><a href="${CONFIG.basePath}${item.url}">${item.title}</a></li>`
+  ).join('\n');
+}
+
+function copyPublicFiles() {
+  if (fs.existsSync(CONFIG.publicDir)) {
+    copyFolderRecursive(CONFIG.publicDir, CONFIG.outputDir);
+  }
+}
+
 function copyFolderRecursive(source, target) {
   if (!fs.existsSync(target)) {
     fs.mkdirSync(target, { recursive: true });
@@ -236,91 +273,61 @@ function copyFolderRecursive(source, target) {
       copyFolderRecursive(sourcePath, targetPath);
     } else {
       fs.copyFileSync(sourcePath, targetPath);
-      console.log(`  📄 Копирован: ${file}`);
     }
   });
 }
 
-// Генерация sitemap.xml
-function generateSitemap(pages) {
-  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${pages.map(page => `  <url>
-    <loc>${CONFIG.siteUrl}${page.url}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <priority>${page.url === '/' ? '1.0' : '0.8'}</priority>
-  </url>`).join('\n')}
-</urlset>`;
-  
-  fs.writeFileSync(path.join(CONFIG.outputDir, 'sitemap.xml'), sitemap);
-  console.log('🗺️ Sitemap сгенерирован');
-}
-
-// Генерация robots.txt
-function generateRobots() {
-  const robots = `User-agent: *
-Allow: /
-Sitemap: ${CONFIG.siteUrl}/sitemap.xml
-`;
-  fs.writeFileSync(path.join(CONFIG.outputDir, 'robots.txt'), robots);
-  console.log('🤖 robots.txt сгенерирован');
-}
-
-// Основная функция сборки
 async function build() {
-  console.log('\n🚀 Начинаем генерацию сайта...\n');
-  console.log(`📁 Контент: ${CONFIG.contentDir}`);
-  console.log(`📁 Вывод: ${CONFIG.outputDir}`);
-  console.log(`🌍 Base Path: ${CONFIG.basePath || '/'}\n`);
+  console.log('\n🚀 Генерация портфолио...\n');
   
   const template = loadTemplate();
   const pages = getAllPages();
-  
-  console.log(`📄 Найдено страниц: ${pages.length}\n`);
-  
   const navigationHtml = generateNavigation();
   
-  // Генерируем страницы
+  // Создаем отдельную страницу со всеми работами
+  const worksPage = pages.find(p => p.url === '/works.html');
+  if (worksPage) {
+    const worksHtml = generateWorksPage(pages);
+    const templateWithWorks = template.replace('{{content}}', worksHtml);
+    const finalHtml = templateWithWorks
+      .replace(/{{title}}/g, 'Мои работы')
+      .replace(/{{description}}/g, 'Портфолио моих проектов')
+      .replace(/{{navigation}}/g, navigationHtml)
+      .replace(/{{siteTitle}}/g, CONFIG.siteTitle)
+      .replace(/{{year}}/g, new Date().getFullYear())
+      .replace(/{{author}}/g, CONFIG.author)
+      .replace(/{{email}}/g, CONFIG.email)
+      .replace(/{{github}}/g, CONFIG.github)
+      .replace(/{{telegram}}/g, CONFIG.telegram)
+      .replace(/{{basePath}}/g, CONFIG.basePath);
+    
+    fs.writeFileSync(path.join(CONFIG.outputDir, 'works.html'), finalHtml);
+    console.log('✅ Страница работ сгенерирована');
+  }
+  
+  // Генерируем остальные страницы
   for (const page of pages) {
-    if (page.metadata.draft) {
-      console.log(`⏭️ Пропуск черновика: ${page.filePath}`);
-      continue;
-    }
-    
-    console.log(`📝 Генерация: ${path.relative(CONFIG.contentDir, page.filePath)} -> ${path.relative(CONFIG.outputDir, page.outputPath)}`);
-    
-    const pageHtml = generatePage(page.filePath, template, navigationHtml);
-    if (pageHtml) {
-      // Создаем директорию если нужно
-      const outputDir = path.dirname(page.outputPath);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
+    if (page.url !== '/works.html') {
+      console.log(`📝 ${page.filePath}`);
+      const pageHtml = generatePage(page.filePath, template, navigationHtml, pages);
+      if (pageHtml) {
+        const outputDir = path.dirname(page.outputPath);
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+        fs.writeFileSync(page.outputPath, pageHtml);
       }
-      fs.writeFileSync(page.outputPath, pageHtml);
     }
   }
   
-  // Копируем публичные файлы
   copyPublicFiles();
   
-  // Генерируем SEO файлы
-  generateSitemap(pages);
-  generateRobots();
-  
-  console.log('\n✅ Генерация завершена!');
-  console.log(`📊 Всего сгенерировано страниц: ${pages.length}`);
-  console.log(`📁 Сайт в папке: ${CONFIG.outputDir}\n`);
+  console.log('\n✅ Готово!');
+  console.log(`📁 Сайт: ${CONFIG.outputDir}\n`);
 }
 
-// Обработка ошибок
-process.on('unhandledRejection', (error) => {
-  console.error('❌ Ошибка:', error);
-  process.exit(1);
-});
-
-// Запуск
 if (require.main === module) {
-  build();
+  build().catch(console.error);
 }
 
 module.exports = { build };
