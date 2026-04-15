@@ -1,0 +1,23 @@
+{
+  "name": "my-static-site-generator",
+  "version": "1.0.0",
+  "description": "Static site generator with CI/CD for GitHub Pages",
+  "main": "src/ssg.js",
+  "scripts": {
+    "build": "node src/ssg.js",
+    "dev": "node src/ssg.js --watch",
+    "serve": "npx serve dist",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": ["ssg", "static-site", "markdown", "github-pages"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "marked": "^11.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "serve": "^14.2.0"
+  }
+}
