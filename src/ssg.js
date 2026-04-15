@@ -9,9 +9,9 @@ const CONFIG = {
   templateDir: './templates',
   publicDir: './public',
   siteTitle: 'Мой SSG Сайт',
-  siteUrl: 'https://Always-in-prime.github.io/REPO_NAME',
+  siteUrl: 'https://Always-in-prime.github.io/ssg',
   // Автоматически определяем basePath для GitHub Pages
-  basePath: process.env.GITHUB_ACTIONS ? '/REPO_NAME' : ''
+  basePath: process.env.GITHUB_ACTIONS ? '/ssg' : ''
 };
 
 // Настройка marked
